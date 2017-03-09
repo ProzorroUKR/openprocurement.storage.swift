@@ -15,7 +15,7 @@ requires = [
     'setuptools',
 ]
 test_requires = requires + [
-    'webtest',
+    'mock',
     'python-coveralls',
 ]
 docs_requires = requires + [
@@ -50,5 +50,5 @@ setup(name='openprocurement.storage.swift',
       install_requires=requires,
       tests_require=test_requires,
       extras_require={'test': test_requires, 'docs': docs_requires},
-      # test_suite="openprocurement.storage.swift.tests.main.suite",
+      test_suite="openprocurement.storage.swift.tests.tests.suite",
       entry_points=entry_points)
