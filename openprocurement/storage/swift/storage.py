@@ -25,11 +25,20 @@ class SwiftStorage:
     connection = None
     container = None
 
-    def __init__(self, preauthtoken, preauthurl, container):
+    def __init__(self, auth_url, auth_version, username, password, project_name, project_domain_name,
+                 user_domain_name, container):
         self.container = container
+        os_options = {
+            'user_domain_name': user_domain_name,
+            'project_domain_name': project_domain_name,
+            'project_name': project_name
+        }
         self.connection = Connection(
-            preauthtoken=preauthtoken,
-            preauthurl=preauthurl
+            authurl=auth_url,
+            auth_version=auth_version,
+            user=username,
+            key=password,
+            os_options=os_options,
         )
 
     def register(self, md5):
