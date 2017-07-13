@@ -98,6 +98,8 @@ class SwiftStorage:
 
         head = object[0]
         content = object[1]
+        content_disposition = head.get('content-disposition')
+
         return {'Content-Type': str(head['content-type']),
-                'Content-Disposition': str(head['content-disposition']),
+                'Content-Disposition': content_disposition.encode('utf8') if content_disposition else None,
                 'Content': content}
