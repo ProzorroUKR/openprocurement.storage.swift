@@ -3,7 +3,7 @@ Backend for https://github.com/openprocurement/openprocurement.documentservice/ 
 
 Install package
 
-    pip install git+http://git.mm.local:8085/openprocurement/openprocurement.storage.swift.git#egg=storage_swift
+    pip install git+https://git.prozorro.gov.ua/mk/openprocurement.storage.swift.git#egg=storage_swift
 
 Add next settings to service.ini:
 ```
