@@ -10,6 +10,7 @@ version = '0.1'
 
 requires = [
     'python-swiftclient',
+    'python-keystoneclient',
     'rfc6266',
     'setuptools',
 ]
