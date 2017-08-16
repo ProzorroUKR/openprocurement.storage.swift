@@ -116,7 +116,10 @@ class SwiftStorageTests(unittest.TestCase):
         with self.assertRaises(StorageRedirect) as storage_redirect:
             self.storage.get(Uuid4Mock.hex)
         url = 'https://swift-proxy-test.com/v1/AUTH_user_id/test_container_name/9a21e3cb/7a40/42ed/ad/98/38ac4b19b358'
-        self.assertTrue(storage_redirect.exception.url.startswith(url))
+        exception_url = storage_redirect.exception.url
+        self.assertTrue(exception_url.startswith(url))
+        self.assertTrue('temp_url_sig' in exception_url)
+        self.assertTrue('temp_url_expires' in exception_url)
 
 
 def suite():

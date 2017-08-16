@@ -1,13 +1,12 @@
-import hmac
 import urlparse
-from time import time
 from swiftclient import ClientException
 from swiftclient.client import Connection
+from swiftclient.utils import generate_temp_url
 from openprocurement.documentservice.storage import HashInvalid, KeyNotFound, ContentUploaded, get_filename, StorageRedirect
 from rfc6266 import build_header
 from urllib import quote
 from uuid import uuid4, UUID
-from hashlib import md5, sha1
+from hashlib import md5
 
 
 def compute_hash(fp, buf_size=8192):
@@ -22,16 +21,6 @@ def compute_hash(fp, buf_size=8192):
     hex_digest = hash_obj.hexdigest()
     fp.seek(spos)
     return hex_digest
-
-
-def generate_temp_url(proxy_host, prefix, path, key, expires):
-    method = 'GET'
-    expires = int(time() + expires)
-    full_path = prefix + '/' + path
-    hmac_body = '%s\n%s\n%s' % (method, expires, full_path)
-    sig = hmac.new(key, hmac_body, sha1).hexdigest()
-    s = '{host}{path}?temp_url_sig={sig}&temp_url_expires={expires}'
-    return s.format(host=proxy_host, path=full_path, sig=sig, expires=expires)
 
 
 class SwiftStorage:
@@ -107,6 +96,6 @@ class SwiftStorage:
             except ValueError:
                 raise KeyNotFound(uuid)
             path = '/'.join([format(i, 'x') for i in UUID(uuid).fields])
-
-        url = generate_temp_url(self.proxy_host, self.url_prefix, path, self.temp_url_key, 300)
-        raise StorageRedirect(url)
+        full_path = self.url_prefix + '/' + path
+        url = str(generate_temp_url(full_path, 300, self.temp_url_key, 'GET', absolute=False))
+        raise StorageRedirect(self.proxy_host + url)
