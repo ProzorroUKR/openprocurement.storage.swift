@@ -15,6 +15,8 @@ def includeme(config):
             settings['swift.project_domain_name'],
             settings['swift.user_domain_name'],
             settings['swift.container'],
+            settings['swift.proxy_host'],
+            settings['swift.temp_url_key'],
         )
     else:
         raise Exception('Wrong settings of SwiftStorage')

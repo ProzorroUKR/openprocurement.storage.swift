@@ -1,6 +1,8 @@
+import urlparse
 from swiftclient import ClientException
 from swiftclient.client import Connection
-from openprocurement.documentservice.storage import HashInvalid, KeyNotFound, ContentUploaded, get_filename
+from swiftclient.utils import generate_temp_url
+from openprocurement.documentservice.storage import HashInvalid, KeyNotFound, ContentUploaded, get_filename, StorageRedirect
 from rfc6266 import build_header
 from urllib import quote
 from uuid import uuid4, UUID
@@ -26,7 +28,7 @@ class SwiftStorage:
     container = None
 
     def __init__(self, auth_url, auth_version, username, password, project_name, project_domain_name,
-                 user_domain_name, container):
+                 user_domain_name, container, proxy_host, temp_url_key):
         self.container = container
         os_options = {
             'user_domain_name': user_domain_name,
@@ -40,6 +42,10 @@ class SwiftStorage:
             key=password,
             os_options=os_options,
         )
+        storage_url, _ = self.connection.get_auth()
+        self.url_prefix = urlparse.urlparse(storage_url).path + '/' + self.container
+        self.temp_url_key = temp_url_key
+        self.proxy_host = proxy_host
 
     def register(self, md5):
         uuid = uuid4().hex
@@ -90,16 +96,6 @@ class SwiftStorage:
             except ValueError:
                 raise KeyNotFound(uuid)
             path = '/'.join([format(i, 'x') for i in UUID(uuid).fields])
-
-        try:
-            object = self.connection.get_object(self.container, path)
-        except ClientException:
-            raise KeyNotFound(uuid)
-
-        head = object[0]
-        content = object[1]
-        content_disposition = head.get('content-disposition')
-
-        return {'Content-Type': str(head['content-type']),
-                'Content-Disposition': content_disposition.encode('utf8') if content_disposition else None,
-                'Content': content}
+        full_path = self.url_prefix + '/' + path
+        url = str(generate_temp_url(full_path, 300, self.temp_url_key, 'GET', absolute=False))
+        raise StorageRedirect(self.proxy_host + url)
