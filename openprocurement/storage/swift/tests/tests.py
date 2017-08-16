@@ -1,7 +1,7 @@
 import mock
 import unittest
-from swiftclient import ClientException
-from openprocurement.documentservice.storage import HashInvalid, KeyNotFound, ContentUploaded
+from swiftclient import ClientException, Connection
+from openprocurement.documentservice.storage import HashInvalid, KeyNotFound, ContentUploaded, StorageRedirect
 from openprocurement.storage.swift.storage import SwiftStorage
 
 
@@ -20,8 +20,9 @@ class SwiftStorageTests(unittest.TestCase):
         self.etag = '1234abcd'
         self.md5 = 'md5:{}'.format(self.etag)
         self.path = '9a21e3cb/7a40/42ed/ad/98/38ac4b19b358'
-
-        self.storage = SwiftStorage('auth_token', 'auth_url', self.container)
+        Connection.get_auth = mock.MagicMock()
+        Connection.get_auth.return_value = (u'https://some-swift-host.com/v1/AUTH_user_id', 'some_token')
+        self.storage = SwiftStorage('auth_url', 'auth_version', 'username', 'password', 'project_name', 'project_domain_name', 'user_domain_name', self.container, 'https://swift-proxy-test.com', 'temp_url_key')
         self.storage.connection.put_object = mock.MagicMock()
         self.storage.connection.put_object.return_value = self.etag
         self.storage.connection.get_object = mock.MagicMock()
@@ -112,21 +113,10 @@ class SwiftStorageTests(unittest.TestCase):
             self.assertEqual(key_not_found.exception.message, Uuid4Mock.hex)
 
     def test_call_get(self):
-        data_obj = self.storage.get(Uuid4Mock.hex)
-        data_expected = {'Content-Type': PostFileMock.type,
-                         'Content-Disposition': 'content-disposition',
-                         'Content': PostFileMock.file}
-        call_expected = [mock.call.get_object(self.container, self.path)]
-
-        self.assertEqual(data_obj, data_expected)
-        self.assertEqual(self.storage.connection.get_object.mock_calls, call_expected)
-
-    def test_call_get_when_incorrect_uuid(self):
-        with self.assertRaises(KeyNotFound) as key_not_found:
-            self.storage.connection.get_object.side_effect = ClientException('exception')
+        with self.assertRaises(StorageRedirect) as storage_redirect:
             self.storage.get(Uuid4Mock.hex)
-
-        self.assertEqual(key_not_found.exception.message, Uuid4Mock.hex)
+        url = 'https://swift-proxy-test.com/v1/AUTH_user_id/test_container_name/9a21e3cb/7a40/42ed/ad/98/38ac4b19b358'
+        self.assertTrue(storage_redirect.exception.url.startswith(url))
 
 
 def suite():
