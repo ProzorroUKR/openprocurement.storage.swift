@@ -1,10 +1,13 @@
+import hmac
+import urlparse
+from time import time
 from swiftclient import ClientException
 from swiftclient.client import Connection
-from openprocurement.documentservice.storage import HashInvalid, KeyNotFound, ContentUploaded, get_filename
+from openprocurement.documentservice.storage import HashInvalid, KeyNotFound, ContentUploaded, get_filename, StorageRedirect
 from rfc6266 import build_header
 from urllib import quote
 from uuid import uuid4, UUID
-from hashlib import md5
+from hashlib import md5, sha1
 
 
 def compute_hash(fp, buf_size=8192):
@@ -21,12 +24,22 @@ def compute_hash(fp, buf_size=8192):
     return hex_digest
 
 
+def generate_temp_url(proxy_host, prefix, path, key, expires):
+    method = 'GET'
+    expires = int(time() + expires)
+    full_path = prefix + '/' + path
+    hmac_body = '%s\n%s\n%s' % (method, expires, full_path)
+    sig = hmac.new(key, hmac_body, sha1).hexdigest()
+    s = '{host}{path}?temp_url_sig={sig}&temp_url_expires={expires}'
+    return s.format(host=proxy_host, path=full_path, sig=sig, expires=expires)
+
+
 class SwiftStorage:
     connection = None
     container = None
 
     def __init__(self, auth_url, auth_version, username, password, project_name, project_domain_name,
-                 user_domain_name, container):
+                 user_domain_name, container, proxy_host, temp_url_key):
         self.container = container
         os_options = {
             'user_domain_name': user_domain_name,
@@ -40,6 +53,10 @@ class SwiftStorage:
             key=password,
             os_options=os_options,
         )
+        storage_url, _ = self.connection.get_auth()
+        self.url_prefix = urlparse.urlparse(storage_url).path + '/' + self.container
+        self.temp_url_key = temp_url_key
+        self.proxy_host = proxy_host
 
     def register(self, md5):
         uuid = uuid4().hex
@@ -91,15 +108,5 @@ class SwiftStorage:
                 raise KeyNotFound(uuid)
             path = '/'.join([format(i, 'x') for i in UUID(uuid).fields])
 
-        try:
-            object = self.connection.get_object(self.container, path)
-        except ClientException:
-            raise KeyNotFound(uuid)
-
-        head = object[0]
-        content = object[1]
-        content_disposition = head.get('content-disposition')
-
-        return {'Content-Type': str(head['content-type']),
-                'Content-Disposition': content_disposition.encode('utf8') if content_disposition else None,
-                'Content': content}
+        url = generate_temp_url(self.proxy_host, self.url_prefix, path, self.temp_url_key, 300)
+        raise StorageRedirect(url)
