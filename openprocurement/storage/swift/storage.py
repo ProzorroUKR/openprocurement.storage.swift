@@ -23,6 +23,10 @@ def compute_hash(fp, buf_size=8192):
     return hex_digest
 
 
+class InvalidEtagError(ValueError):
+    pass
+
+
 class SwiftStorage:
     connection = None
     container = None
@@ -50,7 +54,9 @@ class SwiftStorage:
     def register(self, md5):
         uuid = uuid4().hex
         path = '/'.join([format(i, 'x') for i in UUID(uuid).fields])
-        self.connection.put_object(self.container, path, contents='', headers={"X-Object-Meta-hash": md5})
+        etag = self.connection.put_object(self.container, path, contents='', headers={"X-Object-Meta-hash": md5})
+        if etag is None:
+            raise InvalidEtagError(uuid)
         return uuid
 
     def upload(self, post_file, uuid=None):
@@ -85,6 +91,8 @@ class SwiftStorage:
             content_type=content_type,
             headers={"content_disposition": build_header(filename, filename_compat=quote(filename.encode('utf-8')))}
         )
+        if etag is None:
+            raise InvalidEtagError(uuid)
         return uuid, 'md5:' + etag, content_type, filename
 
     def get(self, uuid):

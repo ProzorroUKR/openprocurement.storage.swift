@@ -2,7 +2,7 @@ import mock
 import unittest
 from swiftclient import ClientException, Connection
 from openprocurement.documentservice.storage import HashInvalid, KeyNotFound, ContentUploaded, StorageRedirect
-from openprocurement.storage.swift.storage import SwiftStorage
+from openprocurement.storage.swift.storage import SwiftStorage, InvalidEtagError
 
 
 class Uuid4Mock(object):
@@ -120,6 +120,15 @@ class SwiftStorageTests(unittest.TestCase):
         self.assertTrue(exception_url.startswith(url))
         self.assertTrue('temp_url_sig' in exception_url)
         self.assertTrue('temp_url_expires' in exception_url)
+
+    def test_put_object_return_none(self):
+        self.storage.connection.put_object.return_value = None
+
+        with self.assertRaises(InvalidEtagError):
+            self.storage.register(self.md5)
+
+        with self.assertRaises(InvalidEtagError):
+            self.storage.upload(PostFileMock)
 
 
 def suite():
