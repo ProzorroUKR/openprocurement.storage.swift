@@ -1,8 +1,9 @@
 import urlparse
+from requests import RequestException
 from swiftclient import ClientException
 from swiftclient.client import Connection
 from swiftclient.utils import generate_temp_url
-from openprocurement.documentservice.storage import HashInvalid, KeyNotFound, ContentUploaded, get_filename, StorageRedirect
+from openprocurement.documentservice.storage import HashInvalid, KeyNotFound, ContentUploaded, StorageUploadError, get_filename, StorageRedirect
 from rfc6266 import build_header
 from urllib import quote
 from uuid import uuid4, UUID
@@ -23,8 +24,13 @@ def compute_hash(fp, buf_size=8192):
     return hex_digest
 
 
-class InvalidEtagError(ValueError):
-    pass
+def catch_swift_error(fn):
+    def wrapped(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except (ClientException, RequestException) as exc:
+            raise StorageUploadError(fn.__name__ + ' failed', exc)
+    return wrapped
 
 
 class SwiftStorage:
@@ -51,14 +57,16 @@ class SwiftStorage:
         self.temp_url_key = temp_url_key
         self.proxy_host = proxy_host
 
+    @catch_swift_error
     def register(self, md5):
         uuid = uuid4().hex
         path = '/'.join([format(i, 'x') for i in UUID(uuid).fields])
         etag = self.connection.put_object(self.container, path, contents='', headers={"X-Object-Meta-hash": md5})
         if etag is None:
-            raise InvalidEtagError(uuid)
+            raise StorageUploadError('register failed: invalid etag for ' + uuid)
         return uuid
 
+    @catch_swift_error
     def upload(self, post_file, uuid=None):
         filename = get_filename(post_file.filename)
         content_type = post_file.type
@@ -92,7 +100,7 @@ class SwiftStorage:
             headers={"content_disposition": build_header(filename, filename_compat=quote(filename.encode('utf-8')))}
         )
         if etag is None:
-            raise InvalidEtagError(uuid)
+            raise StorageUploadError('upload failed: invalid etag for ' + uuid)
         return uuid, 'md5:' + etag, content_type, filename
 
     def get(self, uuid):
