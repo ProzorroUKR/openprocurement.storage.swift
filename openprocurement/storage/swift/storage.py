@@ -1,3 +1,4 @@
+import traceback
 import urlparse
 from requests import RequestException
 from swiftclient import ClientException
@@ -29,7 +30,7 @@ def catch_swift_error(fn):
         try:
             return fn(*args, **kwargs)
         except (ClientException, RequestException) as exc:
-            raise StorageUploadError(fn.__name__ + ' failed', exc)
+            raise StorageUploadError(fn.__name__ + ' failed, caught exception\n' + traceback.format_exc(limit=1))
     return wrapped
 
 
