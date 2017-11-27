@@ -1,7 +1,8 @@
 import mock
 import unittest
+from requests import RequestException
 from swiftclient import ClientException, Connection
-from openprocurement.documentservice.storage import HashInvalid, KeyNotFound, ContentUploaded, StorageRedirect
+from openprocurement.documentservice.storage import HashInvalid, KeyNotFound, ContentUploaded, StorageUploadError, StorageRedirect
 from openprocurement.storage.swift.storage import SwiftStorage
 
 
@@ -120,6 +121,31 @@ class SwiftStorageTests(unittest.TestCase):
         self.assertTrue(exception_url.startswith(url))
         self.assertTrue('temp_url_sig' in exception_url)
         self.assertTrue('temp_url_expires' in exception_url)
+
+    def test_put_object_raise_swift_exception(self):
+        self.storage.connection.put_object.side_effect = ClientException('Swift error')
+        with self.assertRaises(StorageUploadError):
+            self.storage.register(self.md5)
+
+        with self.assertRaises(StorageUploadError):
+            self.storage.upload(PostFileMock)
+
+    def test_put_object_raise_requests_exception(self):
+        self.storage.connection.put_object.side_effect = RequestException('Connection error')
+        with self.assertRaises(StorageUploadError):
+            self.storage.register(self.md5)
+
+        with self.assertRaises(StorageUploadError):
+            self.storage.upload(PostFileMock)
+
+    def test_put_object_return_none(self):
+        self.storage.connection.put_object.return_value = None
+
+        with self.assertRaises(StorageUploadError):
+            self.storage.register(self.md5)
+
+        with self.assertRaises(StorageUploadError):
+            self.storage.upload(PostFileMock)
 
 
 def suite():

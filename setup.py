@@ -6,13 +6,14 @@ here = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(here, 'README.rst')) as f:
     README = f.read()
 
-version = '0.1'
+version = '0.2'
 
 requires = [
     'python-swiftclient',
     'python-keystoneclient',
     'rfc6266',
     'setuptools',
+    'openprocurement.documentservice>=1.1',
 ]
 test_requires = requires + [
     'mock',
