@@ -13,6 +13,7 @@ requires = [
     'python-keystoneclient',
     'rfc6266',
     'setuptools',
+    'openprocurement.documentservice>=1.1',
 ]
 test_requires = requires + [
     'mock',

@@ -29,7 +29,7 @@ def catch_swift_error(fn):
     def wrapped(*args, **kwargs):
         try:
             return fn(*args, **kwargs)
-        except (ClientException, RequestException) as exc:
+        except (ClientException, RequestException):
             raise StorageUploadError(fn.__name__ + ' failed, caught exception\n' + traceback.format_exc(limit=1))
     return wrapped
 
