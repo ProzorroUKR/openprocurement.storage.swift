@@ -115,4 +115,4 @@ class SwiftStorage:
             path = '/'.join([format(i, 'x') for i in UUID(uuid).fields])
         full_path = self.url_prefix + '/' + path
         url = str(generate_temp_url(full_path, 300, self.temp_url_key, 'GET', absolute=False))
-        raise StorageRedirect(self.proxy_host + url)
+        raise StorageRedirect('/'.join([self.proxy_host] + url.split('/')[4:]))
