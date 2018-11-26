@@ -17,6 +17,7 @@ def includeme(config):
             settings['swift.container'],
             settings['swift.proxy_host'],
             settings['swift.temp_url_key'],
+            settings.get('swift.insecure', False)
         )
     else:
         raise Exception('Wrong settings of SwiftStorage')
