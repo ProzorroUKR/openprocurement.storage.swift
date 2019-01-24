@@ -16,8 +16,11 @@ requires = [
     'openprocurement.documentservice>=1.1',
 ]
 test_requires = requires + [
-    'mock',
+    'pytest',
+    'pytest-cov',
     'python-coveralls',
+    'mock',
+    'webtest',
 ]
 docs_requires = requires + [
     'sphinxcontrib-httpdomain',
@@ -42,7 +45,7 @@ setup(name='openprocurement.storage.swift',
       keywords='web services',
       # author='',
       # author_email='',
-      url='https://git.prozorro.gov.ua/mk/openprocurement.storage.swift.git',
+      url='https://git.prozorro.gov.ua/cdb/openprocurement.storage.swift.git',
       license='Apache License 2.0',
       packages=find_packages(exclude=['ez_setup']),
       namespace_packages=['openprocurement', 'openprocurement.storage'],

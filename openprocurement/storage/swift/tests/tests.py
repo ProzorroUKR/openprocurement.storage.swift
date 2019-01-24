@@ -88,7 +88,7 @@ class SwiftStorageTests(unittest.TestCase):
             with self.assertRaises(ContentUploaded) as content_uploaded:
                 self.storage.upload(PostFileMock, Uuid4Mock.hex)
 
-            self.assertEqual(content_uploaded.exception.message, Uuid4Mock.hex)
+            self.assertEqual(str(content_uploaded.exception), Uuid4Mock.hex)
 
     def test_call_upload_when_incorrect_hash(self):
         with mock.patch('openprocurement.storage.swift.storage.get_filename', return_value=PostFileMock.filename):
@@ -103,7 +103,7 @@ class SwiftStorageTests(unittest.TestCase):
                         '']
                     self.storage.upload(PostFileMock, Uuid4Mock.hex)
 
-                self.assertEqual(hash_invalid.exception.message, self.md5)
+                self.assertEqual(str(hash_invalid.exception), self.md5)
 
     def test_call_upload_when_incorrect_uuid(self):
         with mock.patch('openprocurement.storage.swift.storage.get_filename', return_value=PostFileMock.filename):
@@ -111,12 +111,12 @@ class SwiftStorageTests(unittest.TestCase):
                 self.storage.connection.get_object.side_effect = ClientException('exception')
                 self.storage.upload(PostFileMock, Uuid4Mock.hex)
 
-            self.assertEqual(key_not_found.exception.message, Uuid4Mock.hex)
+            self.assertEqual(str(key_not_found.exception).strip('\''), Uuid4Mock.hex)
 
     def test_call_get(self):
         with self.assertRaises(StorageRedirect) as storage_redirect:
             self.storage.get(Uuid4Mock.hex)
-        url = 'https://swift-proxy-test.com/v1/AUTH_user_id/test_container_name/9a21e3cb/7a40/42ed/ad/98/38ac4b19b358'
+        url = 'https://swift-proxy-test.com/9a21e3cb/7a40/42ed/ad/98/38ac4b19b358'
         exception_url = storage_redirect.exception.url
         self.assertTrue(exception_url.startswith(url))
         self.assertTrue('temp_url_sig' in exception_url)
