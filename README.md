@@ -1,9 +1,9 @@
-Backend for https://github.com/openprocurement/openprocurement.documentservice/ for uploading documents to Open Stack Swift storage
+Backend for https://github.com/ProzorroUKR/openprocurement.documentservice/ for uploading documents to Open Stack Swift storage
 
 
 Install package
 
-    pip install git+https://git.prozorro.gov.ua/mk/openprocurement.storage.swift.git#egg=storage_swift
+    pip install .
 
 Add next settings to service.ini:
 ```
