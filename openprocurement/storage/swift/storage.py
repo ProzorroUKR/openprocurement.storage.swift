@@ -39,7 +39,7 @@ class SwiftStorage:
     container = None
 
     def __init__(self, auth_url, auth_version, username, password, project_name, project_domain_name,
-                 user_domain_name, container, proxy_host, temp_url_key):
+                 user_domain_name, container, proxy_host, temp_url_key, insecure=False):
         self.container = container
         os_options = {
             'user_domain_name': user_domain_name,
@@ -52,6 +52,7 @@ class SwiftStorage:
             user=username,
             key=password,
             os_options=os_options,
+            insecure=insecure,
         )
         storage_url, _ = self.connection.get_auth()
         self.url_prefix = urlparse.urlparse(storage_url).path + '/' + self.container
