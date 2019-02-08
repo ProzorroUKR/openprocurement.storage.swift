@@ -1,5 +1,7 @@
-import traceback
+import sys
 from six.moves.urllib_parse import urlparse, quote
+from six import reraise as raise_
+from urllib3.exceptions import HTTPError
 from requests import RequestException
 from swiftclient import ClientException
 from swiftclient.client import Connection
@@ -7,6 +9,7 @@ from swiftclient.utils import generate_temp_url
 from rfc6266 import build_header
 from uuid import uuid4, UUID
 from hashlib import md5
+
 from openprocurement.documentservice.storage import (
     HashInvalid, KeyNotFound, ContentUploaded, StorageUploadError, StorageRedirect, get_filename)
 
@@ -29,8 +32,9 @@ def catch_swift_error(fn):
     def wrapped(*args, **kwargs):
         try:
             return fn(*args, **kwargs)
-        except (ClientException, RequestException):
-            raise StorageUploadError(fn.__name__ + ' failed, caught exception\n' + traceback.format_exc(limit=1))
+        except (ClientException, RequestException, HTTPError):
+            traceback = sys.exc_info()[2]
+            raise_(StorageUploadError, None, traceback)
     return wrapped
 
 
