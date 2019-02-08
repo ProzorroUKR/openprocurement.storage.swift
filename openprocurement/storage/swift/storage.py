@@ -1,14 +1,14 @@
 import traceback
-import urlparse
+from six.moves.urllib_parse import urlparse, quote
 from requests import RequestException
 from swiftclient import ClientException
 from swiftclient.client import Connection
 from swiftclient.utils import generate_temp_url
-from openprocurement.documentservice.storage import HashInvalid, KeyNotFound, ContentUploaded, StorageUploadError, get_filename, StorageRedirect
 from rfc6266 import build_header
-from urllib import quote
 from uuid import uuid4, UUID
 from hashlib import md5
+from openprocurement.documentservice.storage import (
+    HashInvalid, KeyNotFound, ContentUploaded, StorageUploadError, StorageRedirect, get_filename)
 
 
 def compute_hash(fp, buf_size=8192):
@@ -55,7 +55,7 @@ class SwiftStorage:
             insecure=insecure,
         )
         storage_url, _ = self.connection.get_auth()
-        self.url_prefix = urlparse.urlparse(storage_url).path + '/' + self.container
+        self.url_prefix = urlparse(storage_url).path + '/' + self.container
         self.temp_url_key = temp_url_key
         self.proxy_host = proxy_host
 
