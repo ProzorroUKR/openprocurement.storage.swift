@@ -1,0 +1,24 @@
+image: docker:stable
+stages:
+  - test
+
+test:
+  image: prozorro/base:ci
+  stage: test
+  before_script:
+    ##
+    ## Add credentials for dependencies
+    ##
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+    ##  
+    ## Install dependencies
+    ##
+    - pip install git+ssh://git@$GITLAB_HOST/cdb/openprocurement.documentservice.git
+    - pip install -e .[test]
+  script:
+    - py.test --cov=openprocurement.storage.swift
+  coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+%)/'
