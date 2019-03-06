@@ -1,14 +1,17 @@
-import traceback
-import urlparse
+import sys
+from six.moves.urllib_parse import urlparse, quote
+from six import reraise as raise_
+from urllib3.exceptions import HTTPError
 from requests import RequestException
 from swiftclient import ClientException
 from swiftclient.client import Connection
 from swiftclient.utils import generate_temp_url
-from openprocurement.documentservice.storage import HashInvalid, KeyNotFound, ContentUploaded, StorageUploadError, get_filename, StorageRedirect
 from rfc6266 import build_header
-from urllib import quote
 from uuid import uuid4, UUID
 from hashlib import md5
+
+from openprocurement.documentservice.storage import (
+    HashInvalid, KeyNotFound, ContentUploaded, StorageUploadError, StorageRedirect, get_filename)
 
 
 def compute_hash(fp, buf_size=8192):
@@ -29,8 +32,9 @@ def catch_swift_error(fn):
     def wrapped(*args, **kwargs):
         try:
             return fn(*args, **kwargs)
-        except (ClientException, RequestException):
-            raise StorageUploadError(fn.__name__ + ' failed, caught exception\n' + traceback.format_exc(limit=1))
+        except (ClientException, RequestException, HTTPError):
+            traceback = sys.exc_info()[2]
+            raise_(StorageUploadError, None, traceback)
     return wrapped
 
 
@@ -55,7 +59,7 @@ class SwiftStorage:
             insecure=insecure,
         )
         storage_url, _ = self.connection.get_auth()
-        self.url_prefix = urlparse.urlparse(storage_url).path + '/' + self.container
+        self.url_prefix = urlparse(storage_url).path + '/' + self.container
         self.temp_url_key = temp_url_key
         self.proxy_host = proxy_host
 

@@ -2,8 +2,7 @@ image: docker:stable
 stages:
   - test
 
-test:
-  image: prozorro/base:ci
+.test:
   stage: test
   before_script:
     ##
@@ -14,11 +13,29 @@ test:
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
     - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
-    ##  
+    ##
     ## Install dependencies
     ##
-    - pip install git+ssh://git@$GITLAB_HOST/cdb/openprocurement.documentservice.git
-    - pip install -e .[test]
+    - pip install -r requirements.txt
+    - git clone ssh://git@$GITLAB_HOST/cdb/openprocurement.documentservice.git -b refactoring_python3
+
+test_python2:
+  image: prozorro/base:ci
+  stage: test
+  extends: .test
   script:
-    - py.test --cov=openprocurement.storage.swift
+    - pip install -e ./openprocurement.documentservice[test]
+    - pip install -e .[test]
+    - py.test --cov=openprocurement.storage.swift --ignore=openprocurement.documentservice
+  coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+%)/'
+
+test_python3:
+  image: python:3.6-jessie
+  stage: test
+  extends: .test
+  script:
+    - rm -rf ./openprocurement.documentservice/cgi.py
+    - pip install -e ./openprocurement.documentservice[test]
+    - pip install -e .[test]
+    - py.test --cov=openprocurement.storage.swift --ignore=openprocurement.documentservice
   coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+%)/'

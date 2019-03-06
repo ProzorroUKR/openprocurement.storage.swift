@@ -15,6 +15,7 @@ requires = [
     'setuptools',
     'openprocurement.documentservice>=1.1',
 ]
+
 test_requires = requires + [
     'pytest',
     'pytest-cov',
@@ -22,9 +23,7 @@ test_requires = requires + [
     'mock',
     'webtest',
 ]
-docs_requires = requires + [
-    'sphinxcontrib-httpdomain',
-]
+
 entry_points = {
     'openprocurement.documentservice.plugins': [
         'swift = openprocurement.storage.swift:includeme'
@@ -53,6 +52,6 @@ setup(name='openprocurement.storage.swift',
       zip_safe=False,
       install_requires=requires,
       tests_require=test_requires,
-      extras_require={'test': test_requires, 'docs': docs_requires},
+      extras_require={'test': test_requires},
       test_suite="openprocurement.storage.swift.tests.tests.suite",
       entry_points=entry_points)
