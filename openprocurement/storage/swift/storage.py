@@ -68,7 +68,7 @@ class SwiftStorage:
         uuid = uuid4().hex
         path = '/'.join([format(i, 'x') for i in UUID(uuid).fields])
         etag = self.connection.put_object(self.container, path, contents='', headers={"X-Object-Meta-hash": md5})
-        if etag is None:
+        if not etag:
             raise StorageUploadError('register failed: invalid etag for ' + uuid)
         return uuid
 
@@ -105,7 +105,7 @@ class SwiftStorage:
             content_type=content_type,
             headers={"content_disposition": build_header(filename, filename_compat=quote(filename.encode('utf-8')))}
         )
-        if etag is None:
+        if not etag:
             raise StorageUploadError('upload failed: invalid etag for ' + uuid)
         return uuid, 'md5:' + etag, content_type, filename
 
