@@ -6,7 +6,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(here, 'README.rst')) as f:
     README = f.read()
 
-version = '0.4'
+version = '0.5'
 
 requires = [
     'python-swiftclient',
