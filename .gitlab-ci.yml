@@ -1,41 +1,4 @@
-image: docker:stable
-stages:
-  - test
-
-.test:
-  stage: test
-  before_script:
-    ##
-    ## Add credentials for dependencies
-    ##
-    - eval $(ssh-agent -s)
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
-    - mkdir -p ~/.ssh
-    - chmod 700 ~/.ssh
-    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
-    ##
-    ## Install dependencies
-    ##
-    - pip install -r requirements.txt
-    - git clone ssh://git@$GITLAB_HOST/cdb/openprocurement.documentservice.git -b refactoring_python3
-
-test_python2:
-  image: python:2.7-jessie
-  stage: test
-  extends: .test
-  script:
-    - pip install -e ./openprocurement.documentservice[test]
-    - pip install -e .[test]
-    - py.test --cov=openprocurement.storage.swift --ignore=openprocurement.documentservice
-  coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+%)/'
-
-test_python3:
-  image: python:3.6-jessie
-  stage: test
-  extends: .test
-  script:
-    - rm -rf ./openprocurement.documentservice/cgi.py
-    - pip install -e ./openprocurement.documentservice[test]
-    - pip install -e .[test]
-    - py.test --cov=openprocurement.storage.swift --ignore=openprocurement.documentservice
-  coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+%)/'
+include:
+  - project: 'cdb/openprocurement.storage.swift-ci'
+    ref: master
+    file: '.gitlab-ci-private.yml'
