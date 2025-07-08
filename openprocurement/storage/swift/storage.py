@@ -1,6 +1,4 @@
-import sys
-from six.moves.urllib_parse import urlparse, quote
-from six import reraise as raise_
+from urllib.parse import urlparse, quote
 from urllib3.exceptions import HTTPError
 from requests import RequestException
 from swiftclient import ClientException
@@ -11,7 +9,13 @@ from uuid import uuid4, UUID
 from hashlib import md5
 
 from openprocurement.documentservice.storage import (
-    HashInvalid, KeyNotFound, ContentUploaded, StorageUploadError, StorageRedirect, get_filename)
+    HashInvalid,
+    KeyNotFound,
+    ContentUploaded,
+    StorageUploadError,
+    StorageRedirect,
+    get_filename,
+)
 
 
 def compute_hash(fp, buf_size=8192):
@@ -32,9 +36,8 @@ def catch_swift_error(fn):
     def wrapped(*args, **kwargs):
         try:
             return fn(*args, **kwargs)
-        except (ClientException, RequestException, HTTPError):
-            traceback = sys.exc_info()[2]
-            raise_(StorageUploadError, None, traceback)
+        except (ClientException, RequestException, HTTPError) as e:
+            raise StorageUploadError from e
     return wrapped
 
 

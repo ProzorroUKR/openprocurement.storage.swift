@@ -2,7 +2,13 @@ import mock
 import unittest
 from requests import RequestException
 from swiftclient import ClientException, Connection
-from openprocurement.documentservice.storage import HashInvalid, KeyNotFound, ContentUploaded, StorageUploadError, StorageRedirect
+from openprocurement.documentservice.storage import (
+    HashInvalid,
+    KeyNotFound,
+    ContentUploaded,
+    StorageUploadError,
+    StorageRedirect,
+)
 from openprocurement.storage.swift.storage import SwiftStorage
 
 
