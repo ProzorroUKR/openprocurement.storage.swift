@@ -1,0 +1,5 @@
+python-keystoneclient==3.22.0
+python-swiftclient==4.8.0
+oslo.utils<7.0.0
+
+git+https://github.com/ProzorroUKR/rfc6266.git@0.0.6
