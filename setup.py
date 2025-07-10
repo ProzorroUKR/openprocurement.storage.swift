@@ -12,8 +12,7 @@ requires = [
     'python-swiftclient',
     'python-keystoneclient',
     'rfc6266',
-    'setuptools',
-    'openprocurement.documentservice>=1.1',
+    'openprocurement.documentservice>=1.4.0',
 ]
 
 test_requires = requires + [
