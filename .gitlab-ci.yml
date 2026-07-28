@@ -1,4 +1,4 @@
 include:
   - project: 'cdb/openprocurement.storage.swift-ci'
-    ref: master
+    ref: fix/ci-debian-buster-archive
     file: '.gitlab-ci-private.yml'
