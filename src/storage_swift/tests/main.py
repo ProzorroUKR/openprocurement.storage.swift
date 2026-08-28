@@ -1,15 +1,18 @@
-import mock
 import unittest
+from unittest import mock
+
 from requests import RequestException
 from swiftclient import ClientException, Connection
-from openprocurement.documentservice.storage import (
+from documentservice.storage import (
     HashInvalid,
     KeyNotFound,
     ContentUploaded,
     StorageUploadError,
     StorageRedirect,
 )
-from openprocurement.storage.swift.storage import SwiftStorage
+import storage_swift
+from storage_swift import SwiftStorage
+from storage_swift.tests.base import BaseWebTest
 
 
 class Uuid4Mock(object):
@@ -41,7 +44,7 @@ class SwiftStorageTests(unittest.TestCase):
             PostFileMock.file]
 
     def test_call_register(self):
-        with mock.patch('openprocurement.storage.swift.storage.uuid4', return_value=Uuid4Mock):
+        with mock.patch('storage_swift.storage.uuid4', return_value=Uuid4Mock):
             uuid = self.storage.register(self.md5)
             expected = [mock.call.put_object(self.container, self.path, contents='', headers={'X-Object-Meta-hash': self.md5})]
 
@@ -49,9 +52,9 @@ class SwiftStorageTests(unittest.TestCase):
             self.assertEqual(uuid, Uuid4Mock.hex)
 
     def test_call_upload_when_uuid_is_None(self):
-        with mock.patch('openprocurement.storage.swift.storage.uuid4', return_value=Uuid4Mock):
-            with mock.patch('openprocurement.storage.swift.storage.get_filename', return_value=PostFileMock.filename):
-                with mock.patch('openprocurement.storage.swift.storage.build_header', return_value='content_disposition'):
+        with mock.patch('storage_swift.storage.uuid4', return_value=Uuid4Mock):
+            with mock.patch('storage_swift.storage.get_filename', return_value=PostFileMock.filename):
+                with mock.patch('storage_swift.storage.content_disposition', return_value='content_disposition'):
                     uuid, md5, content_type, filename = self.storage.upload(PostFileMock)
                     expected = [mock.call.put_object(self.container,
                                                      self.path,
@@ -66,9 +69,9 @@ class SwiftStorageTests(unittest.TestCase):
                     self.assertEqual(filename, PostFileMock.filename)
 
     def test_call_upload_when_uuid_is_not_None(self):
-        with mock.patch('openprocurement.storage.swift.storage.get_filename', return_value=PostFileMock.filename):
-            with mock.patch('openprocurement.storage.swift.storage.compute_hash', return_value=self.etag):
-                with mock.patch('openprocurement.storage.swift.storage.build_header', return_value='content_disposition'):
+        with mock.patch('storage_swift.storage.get_filename', return_value=PostFileMock.filename):
+            with mock.patch('storage_swift.storage.compute_hash', return_value=self.etag):
+                with mock.patch('storage_swift.storage.content_disposition', return_value='content_disposition'):
                     self.storage.connection.get_object.return_value = [
                         {'content-length': '0',
                          'content-disposition': 'content-disposition',
@@ -90,15 +93,15 @@ class SwiftStorageTests(unittest.TestCase):
                     self.assertEqual(filename, PostFileMock.filename)
 
     def test_call_upload_when_content_uploaded_for_this_uuid(self):
-        with mock.patch('openprocurement.storage.swift.storage.get_filename', return_value=PostFileMock.filename):
+        with mock.patch('storage_swift.storage.get_filename', return_value=PostFileMock.filename):
             with self.assertRaises(ContentUploaded) as content_uploaded:
                 self.storage.upload(PostFileMock, Uuid4Mock.hex)
 
             self.assertEqual(str(content_uploaded.exception), Uuid4Mock.hex)
 
     def test_call_upload_when_incorrect_hash(self):
-        with mock.patch('openprocurement.storage.swift.storage.get_filename', return_value=PostFileMock.filename):
-            with mock.patch('openprocurement.storage.swift.storage.compute_hash', return_value='other_hash'):
+        with mock.patch('storage_swift.storage.get_filename', return_value=PostFileMock.filename):
+            with mock.patch('storage_swift.storage.compute_hash', return_value='other_hash'):
                 with self.assertRaises(HashInvalid) as hash_invalid:
                     self.storage.connection.get_object.return_value = [
                         {'content-length': '0',
@@ -112,7 +115,7 @@ class SwiftStorageTests(unittest.TestCase):
                 self.assertEqual(str(hash_invalid.exception), self.md5)
 
     def test_call_upload_when_incorrect_uuid(self):
-        with mock.patch('openprocurement.storage.swift.storage.get_filename', return_value=PostFileMock.filename):
+        with mock.patch('storage_swift.storage.get_filename', return_value=PostFileMock.filename):
             with self.assertRaises(KeyNotFound) as key_not_found:
                 self.storage.connection.get_object.side_effect = ClientException('exception')
                 self.storage.upload(PostFileMock, Uuid4Mock.hex)
@@ -154,11 +157,28 @@ class SwiftStorageTests(unittest.TestCase):
             self.storage.upload(PostFileMock)
 
 
-def suite():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(SwiftStorageTests))
-    return suite
+class PluginLoadTest(BaseWebTest):
+
+    def test_plugin_loaded_via_entry_point(self):
+        self.assertIsInstance(self.storage, SwiftStorage)
+
+    def test_register(self):
+        response = self.app.post('/register', {'hash': 'md5:' + '0' * 32, 'filename': 'file.txt'})
+        self.assertEqual(response.status, '201 Created')
+        self.assertEqual(response.content_type, 'application/json')
+        self.assertIn('http://localhost/upload/', response.json['upload_url'])
+        self.assertTrue(self.connection.put_object.called)
 
 
-if __name__ == '__main__':
-    unittest.main(defaultTest='suite')
+class IncludemeTest(unittest.TestCase):
+
+    def test_missing_settings(self):
+        config = mock.Mock()
+        config.registry.settings = {'swift.auth_url': 'url', 'swift.username': 'user'}
+        with self.assertRaises(ValueError) as caught:
+            storage_swift.includeme(config)
+        self.assertEqual(
+            str(caught.exception),
+            'swift.auth_version, swift.password, swift.project_name, swift.project_domain_name, '
+            'swift.user_domain_name, swift.container, swift.proxy_host, swift.temp_url_key are required'
+        )

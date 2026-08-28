@@ -4,11 +4,11 @@ from requests import RequestException
 from swiftclient import ClientException
 from swiftclient.client import Connection
 from swiftclient.utils import generate_temp_url
-from rfc6266 import build_header
 from uuid import uuid4, UUID
 from hashlib import md5
 
-from openprocurement.documentservice.storage import (
+from documentservice.rfc6266 import build_header
+from documentservice.storage import (
     HashInvalid,
     KeyNotFound,
     ContentUploaded,
@@ -30,6 +30,12 @@ def compute_hash(fp, buf_size=8192):
     hex_digest = hash_obj.hexdigest()
     fp.seek(spos)
     return hex_digest
+
+
+def content_disposition(filename):
+    # build_header() returns iso-8859-1 bytes; swiftclient wants a str header value
+    header = build_header(filename, filename_compat=quote(filename.encode('utf-8')))
+    return header.decode('iso-8859-1')
 
 
 def catch_swift_error(fn):
@@ -106,7 +112,7 @@ class SwiftStorage:
             path,
             contents=in_file,
             content_type=content_type,
-            headers={"content_disposition": build_header(filename, filename_compat=quote(filename.encode('utf-8')))}
+            headers={"content_disposition": content_disposition(filename)}
         )
         if not etag:
             raise StorageUploadError('upload failed: invalid etag for ' + uuid)
