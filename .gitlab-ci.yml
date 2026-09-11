@@ -1,4 +1,4 @@
 include:
   - project: 'cdb/openprocurement.storage.swift-ci'
-    ref: master
+    ref: feat/image-version
     file: '.gitlab-ci-private.yml'
