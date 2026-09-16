@@ -1,6 +1,6 @@
 [project]
 name = "storage-swift"
-version = "1.0.7"
+version = "1.0.8"
 description = "Open Stack Swift storage for OpenProcurement document service"
 readme = "README.md"
 license = "Apache-2.0"
