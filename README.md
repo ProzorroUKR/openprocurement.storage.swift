@@ -1,20 +1,17 @@
 Backend for https://github.com/ProzorroUKR/openprocurement.documentservice/ for uploading documents to Open Stack Swift storage
 
+Requires Python 3.13 and [uv](https://docs.astral.sh/uv/).
 
-Install package
-```
-pip install git+https://git.prozorro.gov.ua/cdb/openprocurement.storage.swift.git
-```
-    
-Install package for development with documentservice
-```
-git clone git@git.prozorro.gov.ua:cdb/openprocurement.documentservice.git
-cd openprocurement.documentservice
-pip install -r requirements.txt
-pip install -e .[test,docs]
-git clone git@git.prozorro.gov.ua:cdb/openprocurement.storage.swift.git ./src/openprocurement.storage.swift
-pip install -e src/openprocurement.storage.swift[test]
-```
+Install:
+
+    uv sync
+
+`documentservice` is pulled from git over SSH, so you need access to
+`git.prozorro.gov.ua`.
+
+Run the tests:
+
+    uv run pytest
 
 Add next settings to service.ini:
 ```
