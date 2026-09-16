@@ -13,9 +13,6 @@ develop-eggs/
 dist/
 downloads/
 eggs/
-lib/
-lib64/
-parts/
 sdist/
 var/
 *.egg-info/
@@ -54,11 +51,10 @@ docs/_build/
 target/
 
 # Buildout
-bin/
-src/
 
 # Local developer configuration
 .mr.developer.cfg
 
 cover/
 output.html
+.venv/
