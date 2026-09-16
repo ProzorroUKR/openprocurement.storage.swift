@@ -29,7 +29,7 @@ class PostFileMock:
 class SwiftStorageTests(unittest.TestCase):
     def setUp(self):
         self.container = "test_container_name"
-        self.etag = "1234abcd"
+        self.etag = Uuid4Mock.hex
         self.md5 = f"md5:{self.etag}"
         self.path = "9a21e3cb/7a40/42ed/ad/98/38ac4b19b358"
         Connection.get_auth = mock.MagicMock()
@@ -63,23 +63,24 @@ class SwiftStorageTests(unittest.TestCase):
         ]
 
     def test_call_register(self):
-        with mock.patch("storage_swift.storage.uuid4", return_value=Uuid4Mock):
-            uuid = self.storage.register(self.md5)
-            expected = [
-                mock.call.put_object(
-                    self.container,
-                    self.path,
-                    contents="",
-                    headers={"X-Object-Meta-hash": self.md5},
-                )
-            ]
+        uuid = self.storage.register(self.md5)
+        expected = [
+            mock.call.put_object(
+                self.container,
+                self.path,
+                contents="",
+                headers={"X-Object-Meta-hash": self.md5},
+            )
+        ]
 
-            self.assertEqual(self.storage.connection.put_object.mock_calls, expected)
-            self.assertEqual(uuid, Uuid4Mock.hex)
+        self.assertEqual(self.storage.connection.put_object.mock_calls, expected)
+        self.assertEqual(uuid, Uuid4Mock.hex)
 
     def test_call_upload_when_uuid_is_None(self):
         with (
-            mock.patch("storage_swift.storage.uuid4", return_value=Uuid4Mock),
+            mock.patch(
+                "storage_swift.storage.compute_hash", return_value=Uuid4Mock.hex
+            ),
             mock.patch(
                 "storage_swift.storage.get_filename", return_value=PostFileMock.filename
             ),
@@ -201,8 +202,9 @@ class SwiftStorageTests(unittest.TestCase):
         with self.assertRaises(StorageUploadError):
             self.storage.register(self.md5)
 
-        with self.assertRaises(StorageUploadError):
-            self.storage.upload(PostFileMock)
+        with mock.patch("storage_swift.storage.compute_hash", return_value=Uuid4Mock.hex):
+            with self.assertRaises(StorageUploadError):
+                self.storage.upload(PostFileMock)
 
     def test_put_object_raise_requests_exception(self):
         self.storage.connection.put_object.side_effect = RequestException(
@@ -211,8 +213,9 @@ class SwiftStorageTests(unittest.TestCase):
         with self.assertRaises(StorageUploadError):
             self.storage.register(self.md5)
 
-        with self.assertRaises(StorageUploadError):
-            self.storage.upload(PostFileMock)
+        with mock.patch("storage_swift.storage.compute_hash", return_value=Uuid4Mock.hex):
+            with self.assertRaises(StorageUploadError):
+                self.storage.upload(PostFileMock)
 
     def test_put_object_return_none(self):
         self.storage.connection.put_object.return_value = None
@@ -220,8 +223,15 @@ class SwiftStorageTests(unittest.TestCase):
         with self.assertRaises(StorageUploadError):
             self.storage.register(self.md5)
 
-        with self.assertRaises(StorageUploadError):
-            self.storage.upload(PostFileMock)
+        with mock.patch("storage_swift.storage.compute_hash", return_value=Uuid4Mock.hex):
+            with self.assertRaises(StorageUploadError):
+                self.storage.upload(PostFileMock)
+
+    def test_register_deduplication(self):
+        uuid1 = self.storage.register(self.md5)
+        uuid2 = self.storage.register(self.md5)
+        self.assertEqual(uuid1, uuid2)
+        self.assertEqual(uuid1, self.md5[4:])
 
 
 class PluginLoadTest(BaseWebTest):

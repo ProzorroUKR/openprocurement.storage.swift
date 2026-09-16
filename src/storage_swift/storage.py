@@ -1,6 +1,6 @@
 from hashlib import md5
 from urllib.parse import quote, urlparse
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from documentservice.rfc6266 import build_header
 from documentservice.storage import (
@@ -87,7 +87,7 @@ class SwiftStorage:
 
     @catch_swift_error
     def register(self, md5):
-        uuid = uuid4().hex
+        uuid = md5[4:]
         path = "/".join([format(i, "x") for i in UUID(uuid).fields])
         etag = self.connection.put_object(
             self.container, path, contents="", headers={"X-Object-Meta-hash": md5}
@@ -102,7 +102,7 @@ class SwiftStorage:
         content_type = post_file.type
         in_file = post_file.file
         if uuid is None:
-            uuid = uuid4().hex
+            uuid = compute_hash(in_file)
             path = "/".join([format(i, "x") for i in UUID(uuid).fields])
         else:
             try:
