@@ -1,138 +1,203 @@
 import unittest
 from unittest import mock
 
-from requests import RequestException
-from swiftclient import ClientException, Connection
 from documentservice.storage import (
+    ContentUploaded,
     HashInvalid,
     KeyNotFound,
-    ContentUploaded,
-    StorageUploadError,
     StorageRedirect,
+    StorageUploadError,
 )
+from requests import RequestException
+from swiftclient import ClientException, Connection
+
 import storage_swift
 from storage_swift import SwiftStorage
 from storage_swift.tests.base import BaseWebTest
 
 
-class Uuid4Mock(object):
-    hex = '9a21e3cb7a4042edad9838ac4b19b358'
+class Uuid4Mock:
+    hex = "9a21e3cb7a4042edad9838ac4b19b358"
 
-class PostFileMock(object):
-    filename = 'file_name'
-    type = 'text/plain'
-    file = 'Test text'
+
+class PostFileMock:
+    filename = "file_name"
+    type = "text/plain"
+    file = "Test text"
 
 
 class SwiftStorageTests(unittest.TestCase):
     def setUp(self):
-        self.container = 'test_container_name'
-        self.etag = '1234abcd'
-        self.md5 = 'md5:{}'.format(self.etag)
-        self.path = '9a21e3cb/7a40/42ed/ad/98/38ac4b19b358'
+        self.container = "test_container_name"
+        self.etag = "1234abcd"
+        self.md5 = f"md5:{self.etag}"
+        self.path = "9a21e3cb/7a40/42ed/ad/98/38ac4b19b358"
         Connection.get_auth = mock.MagicMock()
-        Connection.get_auth.return_value = (u'https://some-swift-host.com/v1/AUTH_user_id', 'some_token')
-        self.storage = SwiftStorage('auth_url', 'auth_version', 'username', 'password', 'project_name', 'project_domain_name', 'user_domain_name', self.container, 'https://swift-proxy-test.com', 'temp_url_key')
+        Connection.get_auth.return_value = (
+            "https://some-swift-host.com/v1/AUTH_user_id",
+            "some_token",
+        )
+        self.storage = SwiftStorage(
+            "auth_url",
+            "auth_version",
+            "username",
+            "password",
+            "project_name",
+            "project_domain_name",
+            "user_domain_name",
+            self.container,
+            "https://swift-proxy-test.com",
+            "temp_url_key",
+        )
         self.storage.connection.put_object = mock.MagicMock()
         self.storage.connection.put_object.return_value = self.etag
         self.storage.connection.get_object = mock.MagicMock()
         self.storage.connection.get_object.return_value = [
-            {'content-length': '3032',
-             'content-disposition': 'content-disposition',
-             'etag': self.etag,
-             'content-type': PostFileMock.type},
-            PostFileMock.file]
+            {
+                "content-length": "3032",
+                "content-disposition": "content-disposition",
+                "etag": self.etag,
+                "content-type": PostFileMock.type,
+            },
+            PostFileMock.file,
+        ]
 
     def test_call_register(self):
-        with mock.patch('storage_swift.storage.uuid4', return_value=Uuid4Mock):
+        with mock.patch("storage_swift.storage.uuid4", return_value=Uuid4Mock):
             uuid = self.storage.register(self.md5)
-            expected = [mock.call.put_object(self.container, self.path, contents='', headers={'X-Object-Meta-hash': self.md5})]
+            expected = [
+                mock.call.put_object(
+                    self.container,
+                    self.path,
+                    contents="",
+                    headers={"X-Object-Meta-hash": self.md5},
+                )
+            ]
 
             self.assertEqual(self.storage.connection.put_object.mock_calls, expected)
             self.assertEqual(uuid, Uuid4Mock.hex)
 
     def test_call_upload_when_uuid_is_None(self):
-        with mock.patch('storage_swift.storage.uuid4', return_value=Uuid4Mock):
-            with mock.patch('storage_swift.storage.get_filename', return_value=PostFileMock.filename):
-                with mock.patch('storage_swift.storage.content_disposition', return_value='content_disposition'):
-                    uuid, md5, content_type, filename = self.storage.upload(PostFileMock)
-                    expected = [mock.call.put_object(self.container,
-                                                     self.path,
-                                                     contents=PostFileMock.file,
-                                                     content_type=PostFileMock.type,
-                                                     headers={"content_disposition": 'content_disposition'})]
+        with (
+            mock.patch("storage_swift.storage.uuid4", return_value=Uuid4Mock),
+            mock.patch(
+                "storage_swift.storage.get_filename", return_value=PostFileMock.filename
+            ),
+            mock.patch(
+                "storage_swift.storage.content_disposition",
+                return_value="content_disposition",
+            ),
+        ):
+            uuid, md5, content_type, filename = self.storage.upload(PostFileMock)
+            expected = [
+                mock.call.put_object(
+                    self.container,
+                    self.path,
+                    contents=PostFileMock.file,
+                    content_type=PostFileMock.type,
+                    headers={"content_disposition": "content_disposition"},
+                )
+            ]
 
-                    self.assertEqual(self.storage.connection.put_object.mock_calls, expected)
-                    self.assertEqual(uuid, Uuid4Mock.hex)
-                    self.assertEqual(md5, self.md5)
-                    self.assertEqual(content_type, PostFileMock.type)
-                    self.assertEqual(filename, PostFileMock.filename)
+            self.assertEqual(self.storage.connection.put_object.mock_calls, expected)
+            self.assertEqual(uuid, Uuid4Mock.hex)
+            self.assertEqual(md5, self.md5)
+            self.assertEqual(content_type, PostFileMock.type)
+            self.assertEqual(filename, PostFileMock.filename)
 
     def test_call_upload_when_uuid_is_not_None(self):
-        with mock.patch('storage_swift.storage.get_filename', return_value=PostFileMock.filename):
-            with mock.patch('storage_swift.storage.compute_hash', return_value=self.etag):
-                with mock.patch('storage_swift.storage.content_disposition', return_value='content_disposition'):
-                    self.storage.connection.get_object.return_value = [
-                        {'content-length': '0',
-                         'content-disposition': 'content-disposition',
-                         'etag': self.etag,
-                         'content-type': PostFileMock.type,
-                         'x-object-meta-hash': self.md5},
-                        '']
-                    uuid, md5, content_type, filename = self.storage.upload(PostFileMock, Uuid4Mock.hex)
-                    expected = [mock.call.put_object(self.container,
-                                                     self.path,
-                                                     contents=PostFileMock.file,
-                                                     content_type=PostFileMock.type,
-                                                     headers={"content_disposition": 'content_disposition'})]
+        with mock.patch(
+            "storage_swift.storage.get_filename", return_value=PostFileMock.filename
+        ), mock.patch(
+            "storage_swift.storage.compute_hash", return_value=self.etag
+        ), mock.patch(
+            "storage_swift.storage.content_disposition",
+            return_value="content_disposition",
+        ):
+            self.storage.connection.get_object.return_value = [
+                {
+                    "content-length": "0",
+                    "content-disposition": "content-disposition",
+                    "etag": self.etag,
+                    "content-type": PostFileMock.type,
+                    "x-object-meta-hash": self.md5,
+                },
+                "",
+            ]
+            uuid, md5, content_type, filename = self.storage.upload(
+                PostFileMock, Uuid4Mock.hex
+            )
+            expected = [
+                mock.call.put_object(
+                    self.container,
+                    self.path,
+                    contents=PostFileMock.file,
+                    content_type=PostFileMock.type,
+                    headers={"content_disposition": "content_disposition"},
+                )
+            ]
 
-                    self.assertEqual(self.storage.connection.put_object.mock_calls, expected)
-                    self.assertEqual(uuid, Uuid4Mock.hex)
-                    self.assertEqual(md5, self.md5)
-                    self.assertEqual(content_type, PostFileMock.type)
-                    self.assertEqual(filename, PostFileMock.filename)
+            self.assertEqual(
+                self.storage.connection.put_object.mock_calls, expected
+            )
+            self.assertEqual(uuid, Uuid4Mock.hex)
+            self.assertEqual(md5, self.md5)
+            self.assertEqual(content_type, PostFileMock.type)
+            self.assertEqual(filename, PostFileMock.filename)
 
     def test_call_upload_when_content_uploaded_for_this_uuid(self):
-        with mock.patch('storage_swift.storage.get_filename', return_value=PostFileMock.filename):
+        with mock.patch(
+            "storage_swift.storage.get_filename", return_value=PostFileMock.filename
+        ):
             with self.assertRaises(ContentUploaded) as content_uploaded:
                 self.storage.upload(PostFileMock, Uuid4Mock.hex)
 
             self.assertEqual(str(content_uploaded.exception), Uuid4Mock.hex)
 
     def test_call_upload_when_incorrect_hash(self):
-        with mock.patch('storage_swift.storage.get_filename', return_value=PostFileMock.filename):
-            with mock.patch('storage_swift.storage.compute_hash', return_value='other_hash'):
-                with self.assertRaises(HashInvalid) as hash_invalid:
-                    self.storage.connection.get_object.return_value = [
-                        {'content-length': '0',
-                         'content-disposition': 'content-disposition',
-                         'etag': self.etag,
-                         'content-type': PostFileMock.type,
-                         'x-object-meta-hash': self.md5},
-                        '']
-                    self.storage.upload(PostFileMock, Uuid4Mock.hex)
-
-                self.assertEqual(str(hash_invalid.exception), self.md5)
-
-    def test_call_upload_when_incorrect_uuid(self):
-        with mock.patch('storage_swift.storage.get_filename', return_value=PostFileMock.filename):
-            with self.assertRaises(KeyNotFound) as key_not_found:
-                self.storage.connection.get_object.side_effect = ClientException('exception')
+        with mock.patch(
+            "storage_swift.storage.get_filename", return_value=PostFileMock.filename
+        ), mock.patch(
+            "storage_swift.storage.compute_hash", return_value="other_hash"
+        ):
+            with self.assertRaises(HashInvalid) as hash_invalid:
+                self.storage.connection.get_object.return_value = [
+                    {
+                        "content-length": "0",
+                        "content-disposition": "content-disposition",
+                        "etag": self.etag,
+                        "content-type": PostFileMock.type,
+                        "x-object-meta-hash": self.md5,
+                    },
+                    "",
+                ]
                 self.storage.upload(PostFileMock, Uuid4Mock.hex)
 
-            self.assertEqual(str(key_not_found.exception).strip('\''), Uuid4Mock.hex)
+            self.assertEqual(str(hash_invalid.exception), self.md5)
+
+    def test_call_upload_when_incorrect_uuid(self):
+        with mock.patch(
+            "storage_swift.storage.get_filename", return_value=PostFileMock.filename
+        ):
+            with self.assertRaises(KeyNotFound) as key_not_found:
+                self.storage.connection.get_object.side_effect = ClientException(
+                    "exception"
+                )
+                self.storage.upload(PostFileMock, Uuid4Mock.hex)
+
+            self.assertEqual(str(key_not_found.exception).strip("'"), Uuid4Mock.hex)
 
     def test_call_get(self):
         with self.assertRaises(StorageRedirect) as storage_redirect:
             self.storage.get(Uuid4Mock.hex)
-        url = 'https://swift-proxy-test.com/9a21e3cb/7a40/42ed/ad/98/38ac4b19b358'
+        url = "https://swift-proxy-test.com/9a21e3cb/7a40/42ed/ad/98/38ac4b19b358"
         exception_url = storage_redirect.exception.url
         self.assertTrue(exception_url.startswith(url))
-        self.assertTrue('temp_url_sig' in exception_url)
-        self.assertTrue('temp_url_expires' in exception_url)
+        self.assertTrue("temp_url_sig" in exception_url)
+        self.assertTrue("temp_url_expires" in exception_url)
 
     def test_put_object_raise_swift_exception(self):
-        self.storage.connection.put_object.side_effect = ClientException('Swift error')
+        self.storage.connection.put_object.side_effect = ClientException("Swift error")
         with self.assertRaises(StorageUploadError):
             self.storage.register(self.md5)
 
@@ -140,7 +205,9 @@ class SwiftStorageTests(unittest.TestCase):
             self.storage.upload(PostFileMock)
 
     def test_put_object_raise_requests_exception(self):
-        self.storage.connection.put_object.side_effect = RequestException('Connection error')
+        self.storage.connection.put_object.side_effect = RequestException(
+            "Connection error"
+        )
         with self.assertRaises(StorageUploadError):
             self.storage.register(self.md5)
 
@@ -158,27 +225,27 @@ class SwiftStorageTests(unittest.TestCase):
 
 
 class PluginLoadTest(BaseWebTest):
-
     def test_plugin_loaded_via_entry_point(self):
         self.assertIsInstance(self.storage, SwiftStorage)
 
     def test_register(self):
-        response = self.app.post('/register', {'hash': 'md5:' + '0' * 32, 'filename': 'file.txt'})
-        self.assertEqual(response.status, '201 Created')
-        self.assertEqual(response.content_type, 'application/json')
-        self.assertIn('http://localhost/upload/', response.json['upload_url'])
+        response = self.app.post(
+            "/register", {"hash": "md5:" + "0" * 32, "filename": "file.txt"}
+        )
+        self.assertEqual(response.status, "201 Created")
+        self.assertEqual(response.content_type, "application/json")
+        self.assertIn("http://localhost/upload/", response.json["upload_url"])
         self.assertTrue(self.connection.put_object.called)
 
 
 class IncludemeTest(unittest.TestCase):
-
     def test_missing_settings(self):
         config = mock.Mock()
-        config.registry.settings = {'swift.auth_url': 'url', 'swift.username': 'user'}
+        config.registry.settings = {"swift.auth_url": "url", "swift.username": "user"}
         with self.assertRaises(ValueError) as caught:
             storage_swift.includeme(config)
         self.assertEqual(
             str(caught.exception),
-            'swift.auth_version, swift.password, swift.project_name, swift.project_domain_name, '
-            'swift.user_domain_name, swift.container, swift.proxy_host, swift.temp_url_key are required'
+            "swift.auth_version, swift.password, swift.project_name, swift.project_domain_name, "
+            "swift.user_domain_name, swift.container, swift.proxy_host, swift.temp_url_key are required",
         )
