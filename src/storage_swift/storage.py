@@ -1,10 +1,9 @@
-from hashlib import md5
+from hashlib import md5, sha256
 from urllib.parse import quote, urlparse
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from documentservice.rfc6266 import build_header
 from documentservice.storage import (
-    ContentUploaded,
     HashInvalid,
     KeyNotFound,
     StorageRedirect,
@@ -85,15 +84,36 @@ class SwiftStorage:
         self.temp_url_key = temp_url_key
         self.proxy_host = proxy_host
 
+    @staticmethod
+    def _uuid_to_path(uuid):
+        return "/".join([format(i, "x") for i in UUID(uuid).fields])
+
+    @staticmethod
+    def _sha256_uuid(in_file):
+        spos = in_file.tell()
+        uuid = sha256(in_file.read()).hexdigest()[:32]
+        in_file.seek(spos)
+        return uuid
+    
+
     @catch_swift_error
-    def register(self, md5):
-        uuid = md5[4:]
-        path = "/".join([format(i, "x") for i in UUID(uuid).fields])
-        etag = self.connection.put_object(
-            self.container, path, contents="", headers={"X-Object-Meta-hash": md5}
-        )
-        if not etag:
-            raise StorageUploadError("register failed: invalid etag for " + uuid)
+    def register(self, md5_, sha=None):
+        uuid = sha.split(":", 1)[-1][:32] if sha else uuid4().hex
+        path = self._uuid_to_path(uuid)
+        try:
+            etag = self.connection.put_object(
+                self.container, path, contents="",
+                headers={
+                    "X-Object-Meta-hash": md5_, 
+                    "If-None-Match": "*", 
+                    "Expect": "100-Continue"
+                },
+            )
+            if not etag:
+                raise StorageUploadError("register failed: invalid etag for " + uuid)
+        except ClientException as e:
+            if e.http_status != 412:
+                raise
         return uuid
 
     @catch_swift_error
@@ -101,26 +121,28 @@ class SwiftStorage:
         filename = get_filename(post_file.filename)
         content_type = post_file.type
         in_file = post_file.file
+        uuid_provided = uuid is not None
         if uuid is None:
-            uuid = compute_hash(in_file)
-            path = "/".join([format(i, "x") for i in UUID(uuid).fields])
-        else:
-            try:
-                path = "/".join([format(i, "x") for i in UUID(uuid).fields])
-            except ValueError:
-                raise KeyNotFound(uuid)
+            uuid = self._sha256_uuid(in_file)
 
-            try:
-                key = self.connection.get_object(self.container, path)[0]
-            except ClientException:
-                raise KeyNotFound(uuid)
+        try:
+            path = "/".join([format(i, "x") for i in UUID(uuid).fields])
+        except ValueError:
+            raise KeyNotFound(uuid)
+
+        try:
+            key = self.connection.get_object(self.container, path)[0]
+
+            hash_ = key["x-object-meta-hash"]
+            if compute_hash(in_file) != hash_[4:]:
+                raise HashInvalid(hash_)
 
             if key["content-length"] != "0":
-                raise ContentUploaded(uuid)
+                return uuid, "md5:" + key["etag"], content_type, filename
 
-            hash = key["x-object-meta-hash"]
-            if compute_hash(in_file) != hash[4:]:
-                raise HashInvalid(hash)
+        except ClientException:
+            if uuid_provided:
+                raise KeyNotFound(uuid)
 
         etag = self.connection.put_object(
             self.container,
@@ -138,12 +160,9 @@ class SwiftStorage:
             path = uuid
         else:
             try:
-                UUID(uuid)
+                path = self._uuid_to_path(uuid)
             except ValueError:
                 raise KeyNotFound(uuid)
-            path = "/".join([format(i, "x") for i in UUID(uuid).fields])
         full_path = self.url_prefix + "/" + path
-        url = str(
-            generate_temp_url(full_path, 300, self.temp_url_key, "GET", absolute=False)
-        )
+        url = str(generate_temp_url(full_path, 300, self.temp_url_key, "GET", absolute=False))
         raise StorageRedirect("/".join([self.proxy_host] + url.split("/")[4:]))
